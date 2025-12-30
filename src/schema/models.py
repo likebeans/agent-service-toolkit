@@ -25,7 +25,7 @@ class Provider(StrEnum):
     
     定义了系统支持的所有 LLM 服务提供商，用于在配置中指定使用哪个提供商的服务。
     
-    Attributes:
+    属性：
         OPENAI: OpenAI 官方 API
         OPENAI_COMPATIBLE: OpenAI 兼容的第三方 API（如 LM Studio、vLLM 等）
         AZURE_OPENAI: Microsoft Azure 上托管的 OpenAI 服务
@@ -61,7 +61,7 @@ class OpenAIModelName(StrEnum):
     
     参考文档: https://platform.openai.com/docs/models/gpt-4o
     
-    Attributes:
+    属性：
         GPT_5_NANO: GPT-5 Nano 模型，适合轻量级任务
         GPT_5_MINI: GPT-5 Mini 模型，性价比较高
         GPT_5_1: GPT-5.1 模型，最新版本
@@ -77,7 +77,7 @@ class AzureOpenAIModelName(StrEnum):
     
     定义了 Azure OpenAI 服务支持的模型名称。Azure 上的模型名称可能与 OpenAI 官方略有不同。
     
-    Attributes:
+    属性：
         AZURE_GPT_4O: Azure 上部署的 GPT-4o 模型
         AZURE_GPT_4O_MINI: Azure 上部署的 GPT-4o Mini 模型
     """
@@ -94,7 +94,7 @@ class DeepseekModelName(StrEnum):
     
     参考文档: https://api-docs.deepseek.com/quick_start/pricing
     
-    Attributes:
+    属性：
         DEEPSEEK_CHAT: DeepSeek Chat 模型，通用对话模型
     """
     DEEPSEEK_CHAT = "deepseek-chat"
@@ -108,7 +108,7 @@ class AnthropicModelName(StrEnum):
     
     参考文档: https://docs.anthropic.com/en/docs/about-claude/models#model-names
     
-    Attributes:
+    属性：
         HAIKU_45: Claude Haiku 4.5，轻量快速模型
         SONNET_45: Claude Sonnet 4.5，平衡性能与成本
     """
@@ -124,7 +124,7 @@ class GoogleModelName(StrEnum):
     
     参考文档: https://ai.google.dev/gemini-api/docs/models/gemini
     
-    Attributes:
+    属性：
         GEMINI_15_PRO: Gemini 1.5 Pro，强大的多模态模型
         GEMINI_20_FLASH: Gemini 2.0 Flash，快速响应模型
         GEMINI_20_FLASH_LITE: Gemini 2.0 Flash Lite，轻量版本
@@ -149,7 +149,7 @@ class VertexAIModelName(StrEnum):
     
     参考文档: https://cloud.google.com/vertex-ai/generative-ai/docs/models
     
-    Attributes:
+    属性：
         GEMINI_15_PRO: Gemini 1.5 Pro
         GEMINI_20_FLASH: Gemini 2.0 Flash
         GEMINI_20_FLASH_LITE: Gemini 2.0 Flash Lite
@@ -173,7 +173,7 @@ class GroqModelName(StrEnum):
     
     参考文档: https://console.groq.com/docs/models
     
-    Attributes:
+    属性：
         LLAMA_31_8B: Llama 3.1 8B 模型
         LLAMA_33_70B: Llama 3.3 70B 模型
         LLAMA_GUARD_4_12B: Llama Guard 4 12B 内容安全模型
@@ -191,7 +191,7 @@ class AWSModelName(StrEnum):
     
     参考文档: https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
     
-    Attributes:
+    属性：
         BEDROCK_HAIKU: Claude 3.5 Haiku（通过 Bedrock 访问）
         BEDROCK_SONNET: Claude 3.5 Sonnet（通过 Bedrock 访问）
     """
@@ -208,7 +208,7 @@ class OllamaModelName(StrEnum):
     
     参考文档: https://ollama.com/search
     
-    Attributes:
+    属性：
         OLLAMA_GENERIC: 通用 Ollama 模型标识，实际模型需在配置中指定
     """
     OLLAMA_GENERIC = "ollama"
@@ -223,7 +223,7 @@ class OpenRouterModelName(StrEnum):
     
     参考文档: https://openrouter.ai/models
     
-    Attributes:
+    属性：
         GEMINI_25_FLASH: 通过 OpenRouter 访问的 Gemini 2.5 Flash
     """
     GEMINI_25_FLASH = "google/gemini-2.5-flash"
@@ -238,7 +238,7 @@ class OpenAICompatibleName(StrEnum):
     
     参考文档: https://platform.openai.com/docs/guides/text-generation
     
-    Attributes:
+    属性：
         OPENAI_COMPATIBLE: 通用兼容模型标识
     """
     OPENAI_COMPATIBLE = "openai-compatible"
@@ -251,7 +251,7 @@ class FakeModelName(StrEnum):
     用于测试和开发目的的假模型，不会实际调用任何 LLM API。
     适用于单元测试、集成测试和 CI/CD 流水线。
     
-    Attributes:
+    属性：
         FAKE: 虚拟测试模型
     """
     FAKE = "fake"

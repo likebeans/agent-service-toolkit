@@ -24,11 +24,11 @@ class AgentInfo(BaseModel):
     
     描述一个可用 Agent 的基本信息，用于服务发现和 Agent 选择。
     
-    Attributes:
+    属性：
         key: Agent 的唯一标识符，用于在 API 调用中指定使用哪个 Agent
         description: Agent 的功能描述，帮助用户了解该 Agent 的用途
     
-    Example:
+    示例：
         >>> agent = AgentInfo(
         ...     key="research-assistant",
         ...     description="一个用于生成研究报告的助手"
@@ -51,7 +51,7 @@ class ServiceMetadata(BaseModel):
     描述整个服务的配置信息，包括可用的 Agent 列表、支持的模型列表，
     以及默认的 Agent 和模型设置。客户端可以通过这些信息了解服务的能力。
     
-    Attributes:
+    属性：
         agents: 可用 Agent 列表
         models: 支持的 LLM 模型列表
         default_agent: 未指定时使用的默认 Agent
@@ -79,14 +79,14 @@ class UserInput(BaseModel):
     表示用户发送给 Agent 的基本输入，包含消息内容和各种配置选项。
     这是与 Agent 交互的主要数据结构。
     
-    Attributes:
+    属性：
         message: 用户输入的消息内容
         model: 可选，指定使用的 LLM 模型，默认使用服务配置的默认模型
         thread_id: 可选，会话线程 ID，用于保持多轮对话的上下文
         user_id: 可选，用户 ID，用于跨多个会话保持用户状态
         agent_config: 可选，传递给 Agent 的额外配置参数
     
-    Example:
+    示例：
         >>> user_input = UserInput(
         ...     message="今天东京的天气怎么样？",
         ...     thread_id="847c6285-8fc9-4560-a83f-4e6285809254"
@@ -126,7 +126,7 @@ class StreamInput(UserInput):
     继承自 UserInput，增加了流式输出的控制选项。
     用于需要实时获取 Agent 响应的场景。
     
-    Attributes:
+    属性：
         stream_tokens: 是否将 LLM 生成的 token 流式传输到客户端。
                        设为 True 可以实现打字机效果的实时输出。
     """
@@ -143,7 +143,7 @@ class ToolCall(TypedDict):
     表示 LLM 请求调用工具/函数的信息。当 Agent 需要执行外部操作时，
     会生成 ToolCall 来描述要调用的工具及其参数。
     
-    Attributes:
+    属性：
         name: 要调用的工具名称
         args: 工具调用的参数字典
         id: 工具调用的唯一标识符，用于匹配工具调用和响应
@@ -165,7 +165,7 @@ class ChatMessage(BaseModel):
     表示对话中的一条消息，可以是人类消息、AI 消息、工具消息或自定义消息。
     这是对话历史的基本组成单元。
     
-    Attributes:
+    属性：
         type: 消息类型，可选值为：
               - "human": 人类用户发送的消息
               - "ai": AI 助手生成的消息
@@ -216,10 +216,10 @@ class ChatMessage(BaseModel):
         生成一个格式化的字符串，包含带分隔线的标题和消息内容，
         便于在控制台或日志中查看。
         
-        Returns:
+        返回：
             格式化的消息字符串，包含类型标题和内容
             
-        Example:
+        示例：
             >>> msg = ChatMessage(type="human", content="你好")
             >>> print(msg.pretty_repr())
             =============================== Human Message ================================
@@ -250,13 +250,13 @@ class Feedback(BaseModel):  # type: ignore[no-redef]
     用于记录用户对 Agent 响应的反馈，反馈数据会发送到 LangSmith 进行分析。
     这对于评估和改进 Agent 的表现非常重要。
     
-    Attributes:
+    属性：
         run_id: 要记录反馈的运行 ID
         key: 反馈的类型/键名，如 "human-feedback-stars"
         score: 反馈分数，通常在 0.0 到 1.0 之间
         kwargs: 传递给 LangSmith 的额外参数，如评论等
         
-    Example:
+    示例：
         >>> feedback = Feedback(
         ...     run_id="847c6285-8fc9-4560-a83f-4e6285809254",
         ...     key="human-feedback-stars",
@@ -289,7 +289,7 @@ class FeedbackResponse(BaseModel):
     
     表示反馈提交成功的响应。目前只包含一个表示成功的状态字段。
     
-    Attributes:
+    属性：
         status: 响应状态，固定为 "success"
     """
     status: Literal["success"] = "success"
@@ -301,10 +301,10 @@ class ChatHistoryInput(BaseModel):
     
     用于请求获取特定会话线程的聊天历史记录。
     
-    Attributes:
+    属性：
         thread_id: 要查询的会话线程 ID
         
-    Example:
+    示例：
         >>> input = ChatHistoryInput(
         ...     thread_id="847c6285-8fc9-4560-a83f-4e6285809254"
         ... )
@@ -321,7 +321,7 @@ class ChatHistory(BaseModel):
     
     表示一个会话线程的完整消息历史记录。
     
-    Attributes:
+    属性：
         messages: 按时间顺序排列的消息列表
     """
     messages: list[ChatMessage]

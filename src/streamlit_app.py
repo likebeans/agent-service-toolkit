@@ -1,3 +1,32 @@
+"""
+本文件在整个项目中的角色：Streamlit 前端应用（Web UI）。
+
+它解决的核心问题是什么？
+- 给用户提供一个“可交互的聊天界面”，通过 `AgentClient` 调用后端 FastAPI Service：
+  - `/info`：读取可用 Agent/模型，渲染侧边栏配置
+  - `/{agent_id}/invoke`：非流式聊天
+  - `/{agent_id}/stream`：流式聊天（token + 中间消息）
+  - `/feedback`：把用户评分与 run_id 关联起来上报（LangSmith）
+  - `/history`：按 thread_id 恢复历史消息，实现“分享/续聊”
+- 将“UI 复杂度（Streamlit 的状态/容器/重跑）”与“后端协议（SSE、消息结构）”解耦：
+  - 后端协议由 `src/service/service.py` 定义
+  - 客户端协议由 `src/client/client.py` 封装
+  - 本文件只关心如何把这些事件渲染成良好的交互体验
+
+端到端链路（从 UI 到服务端再回来）：
+1) 用户输入（文本/语音） -> 组装 `message/thread_id/user_id/model` -> `AgentClient.astream()/ainvoke()`
+2) 服务端执行 LangGraph Agent -> SSE 推送 message/token/error -> 客户端解析后 yield
+3) `draw_messages()`：
+   - token(str)：写入同一个 placeholder，实现“打字机效果”
+   - message(ChatMessage)：渲染人类/AI/工具结果/自定义任务状态，并更新 session_state
+4) 最后一条 AI 消息展示评分组件 -> `handle_feedback()` 调用 `/feedback`
+
+你在复刻项目时，可以把它当作“一个参考 UI”：重点学习它如何处理：
+- Streamlit 的 `session_state` 生命周期
+- 线程（thread_id）与用户（user_id）在 URL 中的传递与恢复
+- 流式 token 与工具调用的可视化（status/popover/nested status）
+"""
+
 import asyncio
 import os
 import urllib.parse
@@ -13,15 +42,11 @@ from schema import ChatHistory, ChatMessage
 from schema.task_data import TaskData, TaskDataStatus
 from voice import VoiceManager
 
-# A Streamlit app for interacting with the langgraph agent via a simple chat interface.
-# The app has three main functions which are all run async:
-
-# - main() - sets up the streamlit app and high level structure
-# - draw_messages() - draws a set of chat messages - either replaying existing messages
-#   or streaming new ones.
-# - handle_feedback() - Draws a feedback widget and records feedback from the user.
-
-# The app heavily uses AgentClient to interact with the agent's FastAPI endpoints.
+# 一个用于与 LangGraph Agent 交互的 Streamlit 应用（聊天 UI）。
+# 核心协作关系：
+# - UI 侧：本文件负责渲染与交互（streaming token、工具调用状态、评分等）
+# - 客户端：`src/client/client.py` 负责 HTTP/SSE 协议与 schema 解析
+# - 服务端：`src/service/service.py` 定义 API 与 SSE 事件格式
 
 
 APP_TITLE = "Agent Service Toolkit"
@@ -30,37 +55,56 @@ USER_ID_COOKIE = "user_id"
 
 
 def get_or_create_user_id() -> str:
-    """Get the user ID from session state or URL parameters, or create a new one if it doesn't exist."""
-    # Check if user_id exists in session state
+    """
+    获取或创建 user_id（用户标识）。
+
+    设计意图：
+    - Streamlit 本质是“会话 + 重跑”的交互模型；
+    - 我们希望 user_id 在一次会话内稳定，并且可通过 URL 分享/恢复；
+    - user_id 会传给服务端（见 `src/service/service.py:_handle_input()`）用于长期记忆/跨 thread 的用户状态。
+    """
+    # 优先从 session_state 读取（同一会话内最稳定）
     if USER_ID_COOKIE in st.session_state:
         return st.session_state[USER_ID_COOKIE]
 
-    # Try to get from URL parameters using the new st.query_params
+    # 其次从 URL query params 读取（用于分享/恢复；同一 URL 打开能保持 user_id 不变）
     if USER_ID_COOKIE in st.query_params:
         user_id = st.query_params[USER_ID_COOKIE]
         st.session_state[USER_ID_COOKIE] = user_id
         return user_id
 
-    # Generate a new user_id if not found
+    # 都没有则生成新的 user_id（第一次访问）
     user_id = str(uuid.uuid4())
 
-    # Store in session state for this session
+    # 保存到 session_state（对本次会话生效）
     st.session_state[USER_ID_COOKIE] = user_id
 
-    # Also add to URL parameters so it can be bookmarked/shared
+    # 同时写入 URL（便于 bookmark/share）
     st.query_params[USER_ID_COOKIE] = user_id
 
     return user_id
 
 
 async def main() -> None:
+    """
+    Streamlit 应用主入口（异步）。
+
+    高层流程：
+    1) 初始化页面配置与 UI 外观
+    2) 初始化/复用 `AgentClient`（连接后端服务）
+    3) 初始化/复用 `VoiceManager`（可选语音能力）
+    4) 初始化 thread_id，并可从服务端拉取历史（/history）
+    5) 渲染 sidebar 配置与对话历史
+    6) 读取用户输入并触发 invoke/stream
+    7) 渲染反馈组件并上报到 /feedback
+    """
     st.set_page_config(
         page_title=APP_TITLE,
         page_icon=APP_ICON,
         menu_items={},
     )
 
-    # Hide the streamlit upper-right chrome
+    # 隐藏 Streamlit 右上角状态/工具栏区域，让界面更“产品化”。
     st.html(
         """
         <style>
@@ -77,7 +121,7 @@ async def main() -> None:
         await asyncio.sleep(0.1)
         st.rerun()
 
-    # Get or create user ID
+    # 获取/创建 user_id：用于跨 thread 的用户身份。
     user_id = get_or_create_user_id()
 
     if "agent_client" not in st.session_state:
@@ -96,7 +140,7 @@ async def main() -> None:
             st.stop()
     agent_client: AgentClient = st.session_state.agent_client
 
-    # Initialize voice manager (once per session)
+    # 初始化语音模块（每个 session 一次；未配置会返回 None）
     if "voice_manager" not in st.session_state:
         st.session_state.voice_manager = VoiceManager.from_env()
     voice = st.session_state.voice_manager
@@ -115,7 +159,7 @@ async def main() -> None:
         st.session_state.messages = messages
         st.session_state.thread_id = thread_id
 
-    # Config options
+    # Sidebar：配置项（模型、agent、是否流式、是否启用音频、分享/架构等）
     with st.sidebar:
         st.header(f"{APP_ICON} {APP_TITLE}")
 
@@ -126,7 +170,7 @@ async def main() -> None:
         if st.button(":material/chat: New Chat", use_container_width=True):
             st.session_state.messages = []
             st.session_state.thread_id = str(uuid.uuid4())
-            # Clear saved audio when starting new chat
+            # 新对话：清理上一条消息缓存的音频，避免“新对话播放旧音频”
             if "last_audio" in st.session_state:
                 del st.session_state.last_audio
             st.rerun()
@@ -142,7 +186,7 @@ async def main() -> None:
                 index=agent_idx,
             )
             use_streaming = st.toggle("Stream results", value=True)
-            # Audio toggle with callback: clears cached audio when toggled off
+            # 音频开关：关闭时清理缓存音频，避免 UI 误显示
             enable_audio = st.toggle(
                 "Enable audio generation",
                 value=True,
@@ -156,7 +200,7 @@ async def main() -> None:
                 key="enable_audio",
             )
 
-            # Display user ID (for debugging or user information)
+            # 展示 user_id（便于调试/理解“分享链接为什么能保持用户身份”）
             st.text_input("User ID (read-only)", value=user_id, disabled=True)
 
         @st.dialog("Architecture")
@@ -183,10 +227,10 @@ async def main() -> None:
             st_base_url = urllib.parse.urlunparse(
                 [session.client.request.protocol, session.client.request.host, "", "", "", ""]
             )
-            # if it's not localhost, switch to https by default
+            # 如果不是 localhost，默认切换到 https（更符合真实部署环境）
             if not st_base_url.startswith("https") and "localhost" not in st_base_url:
                 st_base_url = st_base_url.replace("http", "https")
-            # Include both thread_id and user_id in the URL for sharing to maintain user identity
+            # 分享链接同时包含 thread_id 与 user_id：既能恢复对话线程，也能保持用户身份（长期记忆）
             chat_url = (
                 f"{st_base_url}?thread_id={st.session_state.thread_id}&{USER_ID_COOKIE}={user_id}"
             )
@@ -201,7 +245,7 @@ async def main() -> None:
             "Made with :material/favorite: by [Joshua](https://www.linkedin.com/in/joshua-k-carroll/) in Oakland"
         )
 
-    # Draw existing messages
+    # 渲染已有消息（可能来自本地 session_state，也可能来自 /history 恢复）
     messages: list[ChatMessage] = st.session_state.messages
 
     if len(messages) == 0:
@@ -221,15 +265,15 @@ async def main() -> None:
         with st.chat_message("ai"):
             st.write(WELCOME)
 
-    # draw_messages() expects an async iterator over messages
+    # draw_messages() 需要一个 async iterator；这里把已存在的消息列表包装成 async generator。
     async def amessage_iter() -> AsyncGenerator[ChatMessage, None]:
         for m in messages:
             yield m
 
     await draw_messages(amessage_iter())
 
-    # Render saved audio for the last AI message (if it exists)
-    # This ensures audio persists across st.rerun() calls
+    # 重新渲染上一条 AI 消息缓存的音频（如果存在）：
+    # Streamlit rerun 会重建 UI 树，因此需要显式把音频再挂回容器里。
     if (
         voice
         and enable_audio
@@ -242,10 +286,11 @@ async def main() -> None:
             audio_data = st.session_state.last_audio
             st.audio(audio_data["data"], format=audio_data["format"])
 
-    # Generate new message if the user provided new input
-    # Use voice manager if available, otherwise fall back to regular input
-    # REQUIRED: Set VOICE_STT_PROVIDER, VOICE_TTS_PROVIDER, OPENAI_API_KEY
-    # in app .env (NOT service .env) to enable voice features.
+    # 获取用户新输入：
+    # - 如果启用了 VoiceManager：支持语音输入并转写
+    # - 否则退化为普通文本输入
+    # 要启用语音功能（在“Streamlit App 的 .env”，而不是 service 的 .env）配置：
+    # - VOICE_STT_PROVIDER / VOICE_TTS_PROVIDER / OPENAI_API_KEY
     if voice:
         user_input = voice.get_chat_input()
     else:
@@ -263,14 +308,15 @@ async def main() -> None:
                     user_id=user_id,
                 )
                 await draw_messages(stream, is_new=True)
-                # Generate TTS audio for streaming response
-                # Note: draw_messages() stores the final message in st.session_state.messages
-                # and the container reference in st.session_state.last_message
+                # 流式模式下：文本已经由 draw_messages() 边收 token 边渲染。
+                # 如果启用了 TTS，则在流结束后为“最终 AI 消息”再生成一次整段音频并渲染到同一容器里。
+                # 注意：draw_messages() 会把最终消息写入 st.session_state.messages，
+                # 并把最后一个 AI 容器引用存到 st.session_state.last_message。
                 if voice and enable_audio and st.session_state.messages:
                     last_msg = st.session_state.messages[-1]
-                    # Only generate audio for AI responses with content
+                    # 只为 AI 且有内容的消息生成音频
                     if last_msg.type == "ai" and last_msg.content:
-                        # Use audio_only=True since text was already streamed by draw_messages()
+                        # audio_only=True：避免重复渲染文本（文本已在流式过程中显示）
                         voice.render_message(
                             last_msg.content,
                             container=st.session_state.last_message,
@@ -284,18 +330,18 @@ async def main() -> None:
                     user_id=user_id,
                 )
                 messages.append(response)
-                # Render AI response with optional voice
+                # 非流式模式：一次性渲染 AI 回复（可选语音）
                 with st.chat_message("ai"):
                     if voice and enable_audio:
                         voice.render_message(response.content)
                     else:
                         st.write(response.content)
-            st.rerun()  # Clear stale containers
+            st.rerun()  # 清理旧容器引用，避免后续渲染混淆
         except AgentClientError as e:
             st.error(f"Error generating response: {e}")
             st.stop()
 
-    # If messages have been generated, show feedback widget
+    # 如果已产生消息，则在最后一条 AI 消息下方展示评分组件
     if len(messages) > 0 and st.session_state.last_message:
         with st.session_state.last_message:
             await handle_feedback()
@@ -306,37 +352,36 @@ async def draw_messages(
     is_new: bool = False,
 ) -> None:
     """
-    Draws a set of chat messages - either replaying existing messages
-    or streaming new ones.
+    渲染一组聊天消息（回放历史 or 渲染新流）。
 
-    This function has additional logic to handle streaming tokens and tool calls.
-    - Use a placeholder container to render streaming tokens as they arrive.
-    - Use a status container to render tool calls. Track the tool inputs and outputs
-      and update the status container accordingly.
+    这是整个 UI 的“渲染中枢”，它要同时处理两类事件：
+    - token（str）：来自 `/stream` 的 token 片段，用 placeholder 实现增量渲染（打字机效果）
+    - message（ChatMessage）：中间/最终消息，包括 human/ai/tool/custom
 
-    The function also needs to track the last message container in session state
-    since later messages can draw to the same container. This is also used for
-    drawing the feedback widget in the latest chat message.
+    关键逻辑：
+    - 对 token：把连续 token 拼成 streaming_content，并写入同一个 `st.empty()` 容器
+    - 对 tool_calls：为每个 tool call 创建 `st.status(...)`，并在收到 ToolMessage 后更新对应 status
+    - 对 sub-agent（transfer_to/transfer_back_to）：进入递归处理，把子 Agent 的输出塞进嵌套 status 容器
+    - 通过 `st.session_state.last_message` 保存“最后一个 AI 消息容器”，方便后续挂载反馈组件/语音播放器
 
     Args:
-        messages_aiter: An async iterator over messages to draw.
-        is_new: Whether the messages are new or not.
+        messages_agen: 一个 async generator，逐个 yield ChatMessage 或 token(str)
+        is_new: True 表示这是“新产生的消息流”，需要写入 st.session_state.messages；False 表示回放历史
     """
 
-    # Keep track of the last message container
+    # 追踪“最后一个消息容器”（Streamlit 的 chat_message/status 都依赖容器上下文）
     last_message_type = None
     st.session_state.last_message = None
 
-    # Placeholder for intermediate streaming tokens
+    # token 流式渲染的占位符与累积缓冲
     streaming_content = ""
     streaming_placeholder = None
 
-    # Iterate over the messages and draw them
+    # 不断从 async generator 读取事件并渲染
     while msg := await anext(messages_agen, None):
-        # str message represents an intermediate token being streamed
+        # str 事件表示 token（流式输出片段）
         if isinstance(msg, str):
-            # If placeholder is empty, this is the first token of a new message
-            # being streamed. We need to do setup.
+            # 第一个 token 到来时，创建一个新的 AI chat_message 容器，并在其中放一个 placeholder。
             if not streaming_placeholder:
                 if last_message_type != "ai":
                     last_message_type = "ai"
@@ -353,26 +398,25 @@ async def draw_messages(
             st.stop()
 
         match msg.type:
-            # A message from the user, the easiest case
+            # human：最简单，直接渲染
             case "human":
                 last_message_type = "human"
                 st.chat_message("human").write(msg.content)
 
-            # A message from the agent is the most complex case, since we need to
-            # handle streaming tokens and tool calls.
+            # ai：最复杂，需要同时处理“流式 token placeholder”与“工具调用状态”
             case "ai":
-                # If we're rendering new messages, store the message in session state
+                # 渲染新消息时，把消息落到 session_state 里（便于 rerun 后回放/反馈）
                 if is_new:
                     st.session_state.messages.append(msg)
 
-                # If the last message type was not AI, create a new chat message
+                # 确保当前处在 AI chat_message 容器中（不同消息类型之间需要切换容器）
                 if last_message_type != "ai":
                     last_message_type = "ai"
                     st.session_state.last_message = st.chat_message("ai")
 
                 with st.session_state.last_message:
-                    # If the message has content, write it out.
-                    # Reset the streaming variables to prepare for the next message.
+                    # 如果本条 AI message 有完整 content，则输出它。
+                    # 同时如果之前在 streaming（有 placeholder），要在这里“收口”并重置 streaming 状态。
                     if msg.content:
                         if streaming_placeholder:
                             streaming_placeholder.write(msg.content)
@@ -382,12 +426,11 @@ async def draw_messages(
                             st.write(msg.content)
 
                     if msg.tool_calls:
-                        # Create a status container for each tool call and store the
-                        # status container by ID to ensure results are mapped to the
-                        # correct status container.
+                        # 对每个 tool call 创建一个 status 容器，并用 tool_call_id 做映射，
+                        # 这样后续 ToolMessage 到来时能更新到正确的 status 上。
                         call_results = {}
                         for tool_call in msg.tool_calls:
-                            # Use different labels for transfer vs regular tool calls
+                            # transfer_to 表示“把控制权交给子 Agent”，在 UI 上用不同 label 区分
                             if "transfer_to" in tool_call["name"]:
                                 label = f"""💼 Sub Agent: {tool_call["name"]}"""
                             else:
@@ -399,7 +442,7 @@ async def draw_messages(
                             )
                             call_results[tool_call["id"]] = status
 
-                        # Expect one ToolMessage for each tool call.
+                        # 约定：每个 tool_call 后面应该对应一个 ToolMessage（工具输出）。
                         for tool_call in msg.tool_calls:
                             if "transfer_to" in tool_call["name"]:
                                 status = call_results[tool_call["id"]]
@@ -407,7 +450,7 @@ async def draw_messages(
                                 await handle_sub_agent_msgs(messages_agen, status, is_new)
                                 break
 
-                            # Only non-transfer tool calls reach this point
+                            # 普通工具调用：渲染 input，并等待下一条 tool message 作为 output
                             status = call_results[tool_call["id"]]
                             status.write("Input:")
                             status.write(tool_call["args"])
@@ -418,8 +461,7 @@ async def draw_messages(
                                 st.write(tool_result)
                                 st.stop()
 
-                            # Record the message if it's new, and update the correct
-                            # status container with the result
+                            # 记录新消息，并把 output 写回到对应的 status 容器中
                             if is_new:
                                 st.session_state.messages.append(tool_result)
                             if tool_result.tool_call_id:
@@ -429,10 +471,10 @@ async def draw_messages(
                             status.update(state="complete")
 
             case "custom":
-                # CustomData example used by the bg-task-agent
-                # See:
-                # - src/agents/utils.py CustomData
-                # - src/agents/bg_task_agent/task.py
+                # custom：用于承载结构化的 UI 事件（例如 bg-task-agent 的任务状态更新）。
+                # 参考：
+                # - `src/agents/utils.py` CustomData
+                # - `src/agents/bg_task_agent/task.py`
                 try:
                     task_data: TaskData = TaskData.model_validate(msg.custom_data)
                 except ValidationError:
@@ -453,7 +495,7 @@ async def draw_messages(
 
                 status.add_and_draw_task_data(task_data)
 
-            # In case of an unexpected message type, log an error and stop
+            # 兜底：未知类型直接报错并停止（避免 UI 进入不一致状态）
             case _:
                 st.error(f"Unexpected ChatMessage type: {msg.type}")
                 st.write(msg)
@@ -461,18 +503,18 @@ async def draw_messages(
 
 
 async def handle_feedback() -> None:
-    """Draws a feedback widget and records feedback from the user."""
+    """渲染评分组件并上报用户反馈（关联 run_id）。"""
 
-    # Keep track of last feedback sent to avoid sending duplicates
+    # 记录上一次发送的反馈，避免重复上报（Streamlit rerun 可能触发重复执行）
     if "last_feedback" not in st.session_state:
         st.session_state.last_feedback = (None, None)
 
     latest_run_id = st.session_state.messages[-1].run_id
     feedback = st.feedback("stars", key=latest_run_id)
 
-    # If the feedback value or run ID has changed, send a new feedback record
+    # 如果评分或 run_id 发生变化，则发送新的反馈记录
     if feedback is not None and (latest_run_id, feedback) != st.session_state.last_feedback:
-        # Normalize the feedback value (an index) to a score between 0 and 1
+        # Streamlit stars 返回的是 index（0..4），这里归一化到 0..1 以适配 LangSmith
         normalized_score = (feedback + 1) / 5.0
 
         agent_client: AgentClient = st.session_state.agent_client
@@ -492,87 +534,93 @@ async def handle_feedback() -> None:
 
 async def handle_sub_agent_msgs(messages_agen, status, is_new):
     """
-    This function segregates agent output into a status container.
-    It handles all messages after the initial tool call message
-    until it reaches the final AI message.
+    处理“子 Agent”输出：把子 Agent 的过程消息收敛到一个 status 容器中。
 
-    Enhanced to support nested multi-agent hierarchies with handoff back messages.
+    背景：
+    - 使用 langgraph-supervisor/hierarchy 时，主 Agent 会通过 tool call `transfer_to_*` 把控制权交给子 Agent；
+    - 子 Agent 执行期间会产生一系列 ai/tool 消息；
+    - 最终通过 `transfer_back_to_*` 再把控制权交回主 Agent。
+
+    本函数负责：
+    - 从 generator 中消费子 Agent 的消息序列
+    - 将工具调用以 popover 的形式展示 input/output
+    - 支持嵌套：子 Agent 内部再 transfer_to 其它子 Agent 时递归处理
 
     Args:
-        messages_agen: Async generator of messages
-        status: the status container for the current agent
-        is_new: Whether messages are new or replayed
+        messages_agen: 消息/事件的 async generator（与 draw_messages 共用同一条流）
+        status: 当前子 Agent 的 status 容器
+        is_new: 是否为新消息（决定是否写入 session_state）
     """
     nested_popovers = {}
 
-    # looking for the transfer Success tool call message
+    # 第一个消息通常是 transfer_to tool call 的“success”回执/中间消息，先消费掉
     first_msg = await anext(messages_agen)
     if is_new:
         st.session_state.messages.append(first_msg)
 
-    # Continue reading until we get an explicit handoff back
+    # 一直读到出现明确的 transfer_back_to（表示控制权归还）
     while True:
-        # Read next message
+        # 读取下一条消息
         sub_msg = await anext(messages_agen)
 
-        # this should only happen is skip_stream flag is removed
+        # 只有当服务端取消 skip_stream 过滤时，才可能在这里收到 token(str)；目前默认不会发生。
         # if isinstance(sub_msg, str):
         #     continue
 
         if is_new:
             st.session_state.messages.append(sub_msg)
 
-        # Handle tool results with nested popovers
+        # 处理工具输出：如果之前为 tool_call 创建了 popover，这里把 output 填进去
         if sub_msg.type == "tool" and sub_msg.tool_call_id in nested_popovers:
             popover = nested_popovers[sub_msg.tool_call_id]
             popover.write("**Output:**")
             popover.write(sub_msg.content)
             continue
 
-        # Handle transfer_back_to tool calls - these indicate a sub-agent is returning control
+        # 处理 transfer_back_to：子 Agent 结束并归还控制权
         if (
             hasattr(sub_msg, "tool_calls")
             and sub_msg.tool_calls
             and any("transfer_back_to" in tc.get("name", "") for tc in sub_msg.tool_calls)
         ):
-            # Process transfer_back_to tool calls
+            # 处理 transfer_back_to tool call，并消费对应的 tool result
             for tc in sub_msg.tool_calls:
                 if "transfer_back_to" in tc.get("name", ""):
-                    # Read the corresponding tool result
+                    # 读取对应的 tool result
                     transfer_result = await anext(messages_agen)
                     if is_new:
                         st.session_state.messages.append(transfer_result)
 
-            # After processing transfer back, we're done with this agent
+            # 完成：更新 status 并退出循环
             if status:
                 status.update(state="complete")
             break
 
-        # Display content and tool calls in the same nested status
+        # 将子 Agent 的内容与工具调用展示在同一个嵌套 status 中
         if status:
             if sub_msg.content:
                 status.write(sub_msg.content)
 
             if hasattr(sub_msg, "tool_calls") and sub_msg.tool_calls:
                 for tc in sub_msg.tool_calls:
-                    # Check if this is a nested transfer/delegate
+                    # 如果是嵌套 transfer_to，则创建更深一层的 status 并递归处理
                     if "transfer_to" in tc["name"]:
-                        # Create a nested status container for the sub-agent
+                        # 为子 Agent 创建嵌套 status 容器
                         nested_status = status.status(
                             f"""💼 Sub Agent: {tc["name"]}""",
                             state="running" if is_new else "complete",
                             expanded=True,
                         )
 
-                        # Recursively handle sub-agents of this sub-agent
+                        # 递归处理子 Agent 的子 Agent
                         await handle_sub_agent_msgs(messages_agen, nested_status, is_new)
                     else:
-                        # Regular tool call - create popover
+                        # 普通工具调用：用 popover 展示 input，并在收到 tool result 后补上 output
                         popover = status.popover(f"{tc['name']}", icon="🛠️")
                         popover.write(f"**Tool:** {tc['name']}")
                         popover.write("**Input:**")
                         popover.write(tc["args"])
-                        # Store the popover reference using the tool call ID
+                        # 用 tool_call_id 关联 popover，后续 tool message 到来时可回填 output
                         nested_popovers[tc["id"]] = popover
 
 

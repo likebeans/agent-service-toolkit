@@ -1,7 +1,14 @@
-"""Speech-to-text factory.
+"""
+本文件在整个项目中的角色：STT（Speech-to-Text）工厂 / Provider 选择器。
 
-This module provides a factory class that loads the appropriate STT provider
-based on configuration.
+它解决的核心问题是什么？
+- 对上层暴露一个稳定的接口：`SpeechToText.transcribe(audio_file) -> str`
+- 内部按配置选择具体 provider 的实现（当前实现了 OpenAI；预留 Deepgram 等扩展点）
+- 将“读取环境变量、选择 provider、构造 provider 实例”的复杂度收敛在一个地方，
+  让 UI/业务代码不用关心不同 provider 的 SDK 差异
+
+典型调用者：
+- `src/voice/manager.py`：在 Streamlit 场景下，把音频输入转写为文本。
 """
 
 import logging
@@ -14,9 +21,8 @@ Provider = Literal["openai", "deepgram"]
 
 
 class SpeechToText:
-    """Speech-to-text factory.
-
-    Loads and delegates to specific STT provider implementations.
+    """
+    STT 工厂类：对外提供统一的“转写”能力，对内委托给具体 provider 实现。
 
     Example:
         >>> stt = SpeechToText(provider="openai")
@@ -29,41 +35,41 @@ class SpeechToText:
     """
 
     def __init__(self, provider: Provider = "openai", api_key: str | None = None, **config):
-        """Initialize STT with specified provider.
+        """初始化 STT（按 provider 选择具体实现）。
 
         Args:
-            provider: Provider name ("openai", "deepgram", etc.)
-            api_key: API key (uses env var if not provided)
-            **config: Provider-specific configuration
+            provider: provider 名称（"openai" / "deepgram" 等）
+            api_key: API key（不传则尝试从环境变量读取）
+            **config: provider 特有的额外配置
 
         Raises:
-            ValueError: If provider is unknown
+            ValueError: provider 不被支持
         """
         self._provider_name = provider
 
-        # Resolve API key from parameter or environment
+        # API key 的解析优先级：显式参数 > 环境变量（便于在 Notebook/测试里临时覆盖）。
         resolved_api_key = self._get_api_key(provider, api_key)
 
-        # Load and configure the provider
+        # 按 provider 动态加载实现类并实例化（避免把所有 provider 的依赖一次性 import 进来）。
         self._provider = self._load_provider(provider, resolved_api_key, config)
 
         logger.info(f"SpeechToText created with provider={provider}")
 
     def _get_api_key(self, provider: Provider, api_key: str | None) -> str | None:
-        """Get API key from parameter or environment.
+        """获取 API key：优先用参数，其次读环境变量。
 
         Args:
-            provider: Provider name
-            api_key: API key from parameter (takes precedence)
+            provider: provider 名称
+            api_key: 调用方传入的 key（优先级最高）
 
         Returns:
-            Resolved API key or None
+            解析后的 key（可能为 None，取决于 provider SDK 是否支持“从环境变量自动读取”）
         """
-        # If API key provided explicitly, use it
+        # 显式传入则直接使用。
         if api_key:
             return api_key
 
-        # Otherwise, get from environment based on provider
+        # 否则按 provider 约定读取环境变量。
         match provider:
             case "openai":
                 return os.getenv("OPENAI_API_KEY")
@@ -73,19 +79,19 @@ class SpeechToText:
                 return None
 
     def _load_provider(self, provider: Provider, api_key: str | None, config: dict):
-        """Load the appropriate STT provider implementation.
+        """加载具体的 STT provider 实现并返回实例。
 
         Args:
-            provider: Provider name
-            api_key: Resolved API key
-            config: Provider-specific configuration
+            provider: provider 名称
+            api_key: 已解析的 key
+            config: provider 特有配置
 
         Returns:
-            Provider instance
+            provider 实例（需要实现 `transcribe(audio_file)`）
 
         Raises:
-            ValueError: If provider is unknown
-            NotImplementedError: If provider not yet implemented
+            ValueError: provider 不被支持
+            NotImplementedError: provider 预留但尚未实现
         """
         match provider:
             case "openai":
@@ -94,33 +100,29 @@ class SpeechToText:
                 return OpenAISTT(api_key=api_key, **config)
 
             case "deepgram":
-                # Example for future extensions: to add Deepgram support, implement DeepgramSTT provider and uncomment:
+                # 未来扩展示例：如果要支持 Deepgram，需要新增对应 provider 实现并在此处实例化。
                 # from voice.providers.deepgram_stt import DeepgramSTT
                 # return DeepgramSTT(api_key=api_key, **config)
                 raise NotImplementedError("Deepgram STT provider not yet implemented")
 
             case _:
-                # Catch-all for unknown providers
+                # 兜底：未知 provider 直接抛错，避免静默降级导致“看起来没声音但其实配置错了”。
                 raise ValueError(f"Unknown STT provider: {provider}. Available providers: openai")
 
     @property
     def provider(self) -> str:
-        """Get the provider name.
-
-        Returns:
-            Provider name string
-        """
+        """获取当前 provider 名称。"""
         return self._provider_name
 
     @classmethod
     def from_env(cls) -> "SpeechToText | None":
-        """Create STT from environment variables.
+        """从环境变量创建 SpeechToText（未配置则返回 None）。
 
-        Reads VOICE_STT_PROVIDER env var to determine which provider to use.
-        Returns None if not configured.
+        读取 `VOICE_STT_PROVIDER` 来决定使用哪个 provider。
+        若未配置该环境变量，则认为“语音转写功能关闭”，返回 None。
 
         Returns:
-            SpeechToText instance or None
+            SpeechToText 实例或 None
 
         Example:
             >>> # In .env: VOICE_STT_PROVIDER=openai
@@ -130,29 +132,29 @@ class SpeechToText:
         """
         provider = os.getenv("VOICE_STT_PROVIDER")
 
-        # If provider not set, voice features are disabled
+        # 未配置 provider => 语音能力关闭（保持应用可用，而不是强依赖语音能力）。
         if not provider:
             logger.debug("VOICE_STT_PROVIDER not set, STT disabled")
             return None
 
         try:
-            # Create instance with provider from environment
-            # Validates provider and raises ValueError if invalid
+            # 用环境变量创建实例：会校验 provider 合法性。
             return cls(provider=cast(Provider, provider))
         except Exception as e:
-            # Log error but don't crash - allow app to continue without voice
+            # 记录错误但不让应用崩溃：语音属于可选能力，失败时应“优雅降级”。
             logger.error(f"Failed to create STT provider: {e}", exc_info=True)
             return None
 
     def transcribe(self, audio_file: BinaryIO) -> str:
-        """Transcribe audio to text.
+        """转写音频为文本（对外统一入口）。
 
-        Delegates to the underlying provider implementation.
+        实现方式：
+        - 直接委托给底层 provider（例如 `OpenAISTT.transcribe`）。
 
         Args:
-            audio_file: Binary audio file
+            audio_file: 二进制音频文件（file-like）
 
         Returns:
-            Transcribed text (empty string on failure)
+            转写文本（失败通常返回空字符串，具体取决于 provider 实现）
         """
         return self._provider.transcribe(audio_file)

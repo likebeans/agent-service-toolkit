@@ -21,7 +21,7 @@ class TaskData(BaseModel):
     表示 Agent 执行过程中一个任务实例的状态和数据。
     用于追踪任务的生命周期（新建 → 运行中 → 完成）和执行结果。
     
-    Attributes:
+    属性：
         name: 任务名称，用于在 UI 中显示
         run_id: 任务运行 ID，用于将状态更新与特定任务实例关联
         state: 任务当前状态，可选值：
@@ -33,7 +33,7 @@ class TaskData(BaseModel):
                 - "error": 执行出错
         data: 任务生成的额外数据，如输入参数、输出结果等
         
-    Example:
+    示例：
         >>> task = TaskData(
         ...     name="检查输入安全性",
         ...     run_id="847c6285-8fc9-4560-a83f-4e6285809254",
@@ -69,7 +69,7 @@ class TaskData(BaseModel):
         """
         检查任务是否已完成
         
-        Returns:
+        返回：
             如果任务状态为 "complete" 则返回 True，否则返回 False
         """
         return self.state == "complete"
@@ -78,7 +78,7 @@ class TaskData(BaseModel):
         """
         检查任务是否以错误状态完成
         
-        Returns:
+        返回：
             如果任务已完成且结果为 "error" 则返回 True，否则返回 False
         """
         return self.state == "complete" and self.result == "error"
@@ -91,7 +91,7 @@ class TaskDataStatus:
     用于在 Streamlit 界面中管理和渲染多个任务的状态更新。
     使用 Streamlit 的 status 组件来展示任务的实时进度。
     
-    Attributes:
+    属性：
         status: Streamlit 的 status 组件实例
         current_task_data: 当前追踪的所有任务数据，以 run_id 为键
         
@@ -117,7 +117,7 @@ class TaskDataStatus:
         根据任务的状态生成相应的状态消息，并更新 Streamlit 的 status 组件。
         同时追踪所有任务的完成状态，以确定整体进度。
         
-        Args:
+        参数：
             task_data: 要添加和渲染的任务数据
             
         状态显示规则：
