@@ -14,14 +14,14 @@ from pydantic import BaseModel, Field
 
 from core import get_model, settings
 
-# Added logger
+# 添加日志记录器
 logger = logging.getLogger(__name__)
 
 
 class AgentState(MessagesState, total=False):
-    """`total=False` is PEP589 specs.
+    """`total=False` 是 PEP589 规范。
 
-    documentation: https://typing.readthedocs.io/en/latest/spec/typeddict.html#totality
+    文档：https://typing.readthedocs.io/en/latest/spec/typeddict.html#totality
     """
 
     birthdate: datetime | None
@@ -45,7 +45,7 @@ Don't tell the user what their sign is, you are just demonstrating your knowledg
 
 
 async def background(state: AgentState, config: RunnableConfig) -> AgentState:
-    """This node is to demonstrate doing work before the interrupt"""
+    """此节点用于演示在中断之前执行工作"""
 
     m = get_model(config["configurable"].get("model", settings.DEFAULT_MODEL))
     model_runnable = wrap_model(m, background_prompt.format())
@@ -77,9 +77,9 @@ class BirthdateExtraction(BaseModel):
 async def determine_birthdate(
     state: AgentState, config: RunnableConfig, store: BaseStore
 ) -> AgentState:
-    """This node examines the conversation history to determine user's birthdate, checking store first."""
+    """此节点检查对话历史以确定用户的出生日期，首先检查存储。"""
 
-    # Attempt to get user_id for unique storage per user
+    # 尝试获取 user_id 以进行每个用户的唯一存储
     user_id = config["configurable"].get("user_id")
     logger.info(f"[determine_birthdate] Extracted user_id: {user_id}")
     namespace = None
@@ -188,7 +188,7 @@ Otherwise, respond conversationally based on their message.
 
 
 async def generate_response(state: AgentState, config: RunnableConfig) -> AgentState:
-    """Generates the final response based on the user's query and the available birthdate."""
+    """根据用户的查询和可用的出生日期生成最终响应。"""
     birthdate = state.get("birthdate")
     if state.get("messages") and isinstance(state["messages"][-1], HumanMessage):
         last_user_message = state["messages"][-1].content

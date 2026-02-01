@@ -7,9 +7,9 @@ from langgraph.types import Command
 
 
 class AgentState(MessagesState, total=False):
-    """`total=False` is PEP589 specs.
+    """`total=False` 是 PEP589 规范。
 
-    documentation: https://typing.readthedocs.io/en/latest/spec/typeddict.html#totality
+    文档：https://typing.readthedocs.io/en/latest/spec/typeddict.html#totality
     """
 
 
@@ -20,7 +20,7 @@ def node_a(state: AgentState) -> Command[Literal["node_b", "node_c"]]:
     print("Called A")
     value = random.choice(["a", "b"])
     goto: Literal["node_b", "node_c"]
-    # this is a replacement for a conditional edge function
+    # 这是一个条件边函数的替代
     if value == "a":
         goto = "node_b"
     else:

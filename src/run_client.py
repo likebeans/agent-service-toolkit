@@ -6,7 +6,7 @@ from schema import ChatMessage
 
 
 async def amain() -> None:
-    #### ASYNC ####
+    #### 异步模式 ####
     client = AgentClient(settings.BASE_URL)
 
     print("Agent info:")
@@ -28,7 +28,7 @@ async def amain() -> None:
 
 
 def main() -> None:
-    #### SYNC ####
+    #### 同步模式 ####
     client = AgentClient(settings.BASE_URL)
 
     print("Agent info:")
@@ -50,8 +50,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    print("Running in sync mode")
+    print("运行同步模式")
     main()
     print("\n\n\n\n\n")
-    print("Running in async mode")
+    print("运行异步模式")
     asyncio.run(amain())

@@ -66,8 +66,8 @@ ModelT: TypeAlias = (
 
 @cache
 def get_model(model_name: AllModelEnum, /) -> ModelT:
-    # NOTE: models with streaming=True will send tokens as they are generated
-    # if the /stream endpoint is called with stream_tokens=True (the default)
+    # 注意：当使用 streaming=True 的模型时，如果调用 /stream 端点且 stream_tokens=True（默认），则会随着生成发送令牌
+    # 如果 /stream 端点被调用且 stream_tokens=True（默认）
     api_model_name = _MODEL_TABLE.get(model_name)
     if not api_model_name:
         raise ValueError(f"Unsupported model: {model_name}")

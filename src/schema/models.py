@@ -26,13 +26,13 @@ class OpenAIModelName(StrEnum):
 
 
 class AzureOpenAIModelName(StrEnum):
-    """Azure OpenAI model names"""
+    """Azure OpenAI 模型名称"""
 
     AZURE_GPT_4O = "azure-gpt-4o"
     AZURE_GPT_4O_MINI = "azure-gpt-4o-mini"
 
 
-class DeepseekModelName(StrEnum):
+class DeepSeekModelName(StrEnum):
     """https://api-docs.deepseek.com/quick_start/pricing"""
 
     DEEPSEEK_CHAT = "deepseek-chat"
@@ -95,14 +95,14 @@ class OpenRouterModelName(StrEnum):
     GEMINI_25_FLASH = "google/gemini-2.5-flash"
 
 
-class OpenAICompatibleName(StrEnum):
+class OpenAICompatibleModelName(StrEnum):
     """https://platform.openai.com/docs/guides/text-generation"""
 
     OPENAI_COMPATIBLE = "openai-compatible"
 
 
 class FakeModelName(StrEnum):
-    """Fake model for testing."""
+    """用于测试的虚假模型。"""
 
     FAKE = "fake"
 

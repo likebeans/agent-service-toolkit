@@ -1,64 +1,64 @@
-# GitHub MCP Agent
+# GitHub MCP 代理
 
-The GitHub MCP Agent is a specialized agent that uses GitHub MCP (Model Context Protocol) tools for repository management and development workflows. It's built using LangGraph's `create_react_agent` for a clean, ReAct (Reasoning and Acting) pattern implementation.
+GitHub MCP 代理是一个使用 GitHub MCP（Model Context Protocol，模型上下文协议）工具来进行代码仓库管理与开发流程的专用代理。它基于 LangGraph 的 `create_react_agent` 构建，实现了清晰的 ReAct（推理与行动）模式。
 
-**This agent is designed as a demo for agents that use MCP (Model Context Protocol) servers and tools.**
+**此代理旨在演示使用 MCP（模型上下文协议）服务器与工具的代理。**
 
-## Features
-[The Github MCP server](https://github.com/github/github-mcp-server) provides a variety of tools, if a PAT is configured.
+## 功能
+[GitHub MCP 服务器](https://github.com/github/github-mcp-server) 在配置了 PAT 后提供多种工具。
 
-- Repository management (create, clone, browse)
-- Issue management (create, list, update, close)
-- Pull request management (create, review, merge)
-- Branch management (create, switch, merge)
-- File operations (read, write, search)
-- Commit operations (create, view history)
+- 仓库管理（创建、克隆、浏览）
+- Issue 管理（创建、列表、更新、关闭）
+- Pull Request 管理（创建、评审、合并）
+- 分支管理（创建、切换、合并）
+- 文件操作（读取、写入、搜索）
+- 提交操作（创建、查看历史）
 
-## Configuration
+## 配置
 
-To enable the GitHub MCP Agent, you need to configure the following environment variables:
+要启用 GitHub MCP 代理，你需要配置以下环境变量：
 
-### Required Settings
+### 必需设置
 
 ```bash
-# GitHub Personal Access Token (required for GitHub MCP server)
-# If not set, the GitHub MCP agent will have no tools
+# GitHub 个人访问令牌（PAT），用于 GitHub MCP 服务器
+# 如果未设置，GitHub MCP 代理将没有可用工具
 GITHUB_PAT=your_github_personal_access_token_here
 ```
 
-### Optional Settings
+### 可选设置
 
 ```bash
-# GitHub MCP server URL (defaults to https://api.githubcopilot.com/mcp/)
+# GitHub MCP 服务器 URL（默认：https://api.githubcopilot.com/mcp/）
 MCP_GITHUB_SERVER_URL=https://api.githubcopilot.com/mcp/
 ```
 
-## GitHub Personal Access Token
+## GitHub 个人访问令牌
 
-To use the GitHub MCP Agent, you need a GitHub Personal Access Token (PAT) with appropriate permissions. The GitHub MCP server provides a wide variety of tools for repository management, and different tools require different scopes.
+使用 GitHub MCP 代理需要一个具备适当权限的 GitHub 个人访问令牌（PAT）。GitHub MCP 服务器提供了广泛的仓库管理工具，不同工具需要不同的作用域。
 
-1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
-2. Generate a new token with the following scopes:
-   - `repo` (Full control of private repositories) - Enables tools like `create_issue`, `create_pull_request`, `get_file_contents`, `list_commits`
-   - `read:org` (Read org and team membership) - Enables organization-related tools
-   - `read:user` (Read user profile data) - Enables user profile tools
-   - `user:email` (Access user email addresses) - Enables email-related functionality
+1. 前往 GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. 生成一个具有以下作用域的令牌：
+   - `repo`（对私有仓库的完全控制）——启用诸如 `create_issue`、`create_pull_request`、`get_file_contents`、`list_commits` 等工具
+   - `read:org`（读取组织和团队成员信息）——启用与组织相关的工具
+   - `read:user`（读取用户资料数据）——启用用户资料相关工具
+   - `user:email`（访问用户邮箱地址）——启用邮箱相关功能
 
-**Note**: The specific tools available depend on your PAT scopes. With the recommended scopes above, you'll have access to most repository management tools including creating issues, pull requests, reading file contents, and listing commits.
+**注意**：可用的具体工具取决于你的 PAT 作用域。使用上述推荐作用域，你将获得大多数仓库管理工具的访问能力，包括创建 issue、pull request、读取文件内容以及列出提交记录。
 
-## Usage
+## 用法
 
-Once configured, the GitHub MCP Agent will be available as `github-mcp-agent` in the service.
+配置完成后，GitHub MCP 代理将在服务中以 `github-mcp-agent` 的名称可用。
 
-### Example Prompts
+### 示例提示词
 
-Here are some example prompts you can use with the GitHub MCP Agent:
+以下是一些可与 GitHub MCP 代理配合使用的示例提示词：
 
-- **"Describe the JoshuaC215/agent-service-toolkit repository"** - Shows repository information and README content
-- **"List the recent commits in this repository"** - Displays recent commit history
-- **"What files are in the src directory?"** - Lists files in a specific directory
-- **"Show me the README file"** - Displays repository README content
-- **"Create a new issue titled 'Bug: Login not working' with the description 'The login form is not responding to user input'"** - Creates a new issue
-- **"What are the open issues in this repository?"** - Lists open issues
-- **"Create a pull request from feature-branch to main with the title 'Add new feature'"** - Creates a pull request
-- **"Show me information about this repository"** - Displays repository details
+- **“描述 JoshuaC215/agent-service-toolkit 仓库”** —— 展示仓库信息和 README 内容
+- **“列出该仓库的近期提交”** —— 显示最近的提交历史
+- **“src 目录里有哪些文件？”** —— 列出特定目录的文件
+- **“显示 README 文件”** —— 显示仓库 README 内容
+- **“创建一个标题为‘Bug：登录不可用’，描述为‘登录表单没有响应用户输入’的新 issue”** —— 创建一个新 issue
+- **“该仓库有哪些未关闭的 issue？”** —— 列出未关闭的 issue
+- **“从 feature-branch 到 main 创建一个标题为‘Add new feature’的 pull request”** —— 创建一个 pull request
+- **“显示该仓库的信息”** —— 展示仓库详情

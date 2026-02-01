@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 def validate_postgres_config() -> None:
     """
-    Validate that all required PostgreSQL configuration is present.
-    Raises ValueError if any required configuration is missing.
+    验证是否提供了所有必需的 PostgreSQL 配置。
+    如果缺少任何必需配置，则抛出 ValueError。
     """
     required_vars = [
         "POSTGRES_USER",
@@ -38,7 +38,7 @@ def validate_postgres_config() -> None:
 
 
 def get_postgres_connection_string() -> str:
-    """Build and return the PostgreSQL connection string from settings."""
+    """从设置构建并返回 PostgreSQL 连接字符串。"""
     if settings.POSTGRES_PASSWORD is None:
         raise ValueError("POSTGRES_PASSWORD is not set")
     return (
@@ -51,7 +51,7 @@ def get_postgres_connection_string() -> str:
 
 @asynccontextmanager
 async def get_postgres_saver():
-    """Initialize and return a PostgreSQL saver instance based on a connection pool for more resilent connections."""
+    """基于连接池初始化并返回 PostgreSQL 保存器实例，以获得更弹性的连接。"""
     validate_postgres_config()
     application_name = settings.POSTGRES_APPLICATION_NAME + "-" + "saver"
 
@@ -76,9 +76,9 @@ async def get_postgres_saver():
 @asynccontextmanager
 async def get_postgres_store():
     """
-    Get a PostgreSQL store instance based on a connection pool for more resilent connections.
+    基于连接池获取 PostgreSQL 存储实例，以获得更弹性的连接。
 
-    Returns an AsyncPostgresStore instance that can be used with async context manager pattern.
+    返回一个可以与异步上下文管理器模式一起使用的 AsyncPostgresStore 实例。
 
     """
     validate_postgres_config()

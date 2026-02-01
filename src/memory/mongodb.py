@@ -21,8 +21,8 @@ def _has_auth_credentials() -> bool:
 
 def validate_mongo_config() -> None:
     """
-    Validate that all required MongoDB configuration is present.
-    Raises ValueError if any required configuration is missing.
+    验证是否提供了所有必需的 MongoDB 配置。
+    如果缺少任何必需配置，则抛出 ValueError。
     """
     required_always = ["MONGO_HOST", "MONGO_PORT", "MONGO_DB"]
     missing_always = [var for var in required_always if not getattr(settings, var, None)]
@@ -36,7 +36,7 @@ def validate_mongo_config() -> None:
 
 
 def get_mongo_connection_string() -> str:
-    """Build and return the MongoDB connection string from settings."""
+    """从设置构建并返回 MongoDB 连接字符串。"""
 
     if _has_auth_credentials():
         if settings.MONGO_PASSWORD is None:  # for type checking
@@ -53,7 +53,7 @@ def get_mongo_connection_string() -> str:
 
 
 def get_mongo_saver() -> AbstractAsyncContextManager[AsyncMongoDBSaver]:
-    """Initialize and return a MongoDB saver instance."""
+    """初始化并返回 MongoDB 保存器实例。"""
     validate_mongo_config()
     if settings.MONGO_DB is None:  # for type checking
         raise ValueError("MONGO_DB is not set")

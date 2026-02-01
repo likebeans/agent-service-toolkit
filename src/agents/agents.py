@@ -18,9 +18,9 @@ from schema import AgentInfo
 
 DEFAULT_AGENT = "research-assistant"
 
-# Type alias to handle LangGraph's different agent patterns
-# - @entrypoint functions return Pregel
-# - StateGraph().compile() returns CompiledStateGraph
+# 类型别名，用于处理 LangGraph 的不同代理模式
+# - @entrypoint 函数返回 Pregel
+# - StateGraph().compile() 返回 CompiledStateGraph
 AgentGraph = CompiledStateGraph | Pregel  # What get_agent() returns (always loaded)
 AgentGraphLike = CompiledStateGraph | Pregel | LazyLoadingAgent  # What can be stored in registry
 

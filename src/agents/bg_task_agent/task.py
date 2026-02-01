@@ -51,3 +51,15 @@ class Task:
         self.result = result
         task_message = self._generate_and_dispatch_message(writer, data)
         return task_message
+
+    def cancel(self):
+        self.state = "new"
+
+    def get_result(self):
+        return self.result
+
+    def list_tasks(self):
+        return self.name
+
+    def clean_tasks(self):
+        return self.name

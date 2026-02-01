@@ -6,9 +6,9 @@ from pydantic import BaseModel, Field
 
 
 class CustomData(BaseModel):
-    "Custom data being sent by an agent"
+    "由代理发送的自定义数据"
 
-    data: dict[str, Any] = Field(description="The custom data")
+    data: dict[str, Any] = Field(description="自定义数据")
 
     def to_langchain(self) -> ChatMessage:
         return ChatMessage(content=[self.data], role="custom")

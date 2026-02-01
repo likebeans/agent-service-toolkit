@@ -25,7 +25,7 @@ def convert_message_content_to_string(content: str | list[str | dict]) -> str:
 
 
 def langchain_to_chat_message(message: BaseMessage) -> ChatMessage:
-    """Create a ChatMessage from a LangChain message."""
+    """从 LangChain 消息创建 ChatMessage。"""
     match message:
         case HumanMessage():
             human_message = ChatMessage(
@@ -65,7 +65,7 @@ def langchain_to_chat_message(message: BaseMessage) -> ChatMessage:
 
 
 def remove_tool_calls(content: str | list[str | dict]) -> str | list[str | dict]:
-    """Remove tool calls from content."""
+    """从内容中移除工具调用。"""
     if isinstance(content, str):
         return content
     # Currently only Anthropic models stream tool calls, using content item type tool_use.

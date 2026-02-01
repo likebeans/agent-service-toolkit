@@ -16,9 +16,9 @@ from core import get_model, settings
 
 
 class AgentState(MessagesState, total=False):
-    """`total=False` is PEP589 specs.
+    """`total=False` 是 PEP589 规范。
 
-    documentation: https://typing.readthedocs.io/en/latest/spec/typeddict.html#totality
+    文档: https://typing.readthedocs.io/en/latest/spec/typeddict.html#totality
     """
 
     safety: LlamaGuardOutput
@@ -28,8 +28,8 @@ class AgentState(MessagesState, total=False):
 web_search = DuckDuckGoSearchResults(name="WebSearch")
 tools = [web_search, calculator]
 
-# Add weather tool if API key is set
-# Register for an API key at https://openweathermap.org/api/
+# 如果设置了 API 密钥，添加天气工具
+# 在 https://openweathermap.org/api/ 注册 API 密钥
 if settings.OPENWEATHERMAP_API_KEY:
     wrapper = OpenWeatherMapAPIWrapper(
         openweathermap_api_key=settings.OPENWEATHERMAP_API_KEY.get_secret_value()
@@ -38,16 +38,15 @@ if settings.OPENWEATHERMAP_API_KEY:
 
 current_date = datetime.now().strftime("%B %d, %Y")
 instructions = f"""
-    You are a helpful research assistant with the ability to search the web and use other tools.
-    Today's date is {current_date}.
+    你是一个有用的研究助手，有能力搜索网络和使用其他工具。
+    今天的日期是 {current_date}。
 
-    NOTE: THE USER CAN'T SEE THE TOOL RESPONSE.
+    注意：用户看不到工具响应。
 
-    A few things to remember:
-    - Please include markdown-formatted links to any citations used in your response. Only include one
-    or two citations per response unless more are needed. ONLY USE LINKS RETURNED BY THE TOOLS.
-    - Use calculator tool with numexpr to answer math questions. The user does not understand numexpr,
-      so for the final response, use human readable format - e.g. "300 * 200", not "(300 \\times 200)".
+    需要记住的几点：
+    - 请在响应中包含 markdown 格式的链接到任何使用的引用。每个响应只包含一个或两个引用，除非需要更多。只使用工具返回的链接。
+    - 使用计算器工具和 numexpr 来回答数学问题。用户不理解 numexpr，
+      所以对于最终响应，使用人类可读的格式 - 例如 "300 * 200"，而不是 "(300 \\times 200)".
     """
 
 
@@ -72,7 +71,7 @@ async def acall_model(state: AgentState, config: RunnableConfig) -> AgentState:
     model_runnable = wrap_model(m)
     response = await model_runnable.ainvoke(state, config)
 
-    # Run llama guard check here to avoid returning the message if it's unsafe
+    # 在这里运行 llama guard 检查，以避免返回不安全的消息
     llama_guard = LlamaGuard()
     safety_output = await llama_guard.ainvoke("Agent", state["messages"] + [response])
     if safety_output.safety_assessment == SafetyAssessment.UNSAFE:
@@ -83,11 +82,11 @@ async def acall_model(state: AgentState, config: RunnableConfig) -> AgentState:
             "messages": [
                 AIMessage(
                     id=response.id,
-                    content="Sorry, need more steps to process this request.",
+                    content="抱歉，需要更多步骤来处理此请求。",
                 )
             ]
         }
-    # We return a list, because this will get added to the existing list
+    # 我们返回一个列表，因为这将被添加到现有列表中
     return {"messages": [response]}
 
 
@@ -102,7 +101,7 @@ async def block_unsafe_content(state: AgentState, config: RunnableConfig) -> Age
     return {"messages": [format_safety_message(safety)]}
 
 
-# Define the graph
+# 定义图
 agent = StateGraph(AgentState)
 agent.add_node("model", acall_model)
 agent.add_node("tools", ToolNode(tools))
@@ -111,7 +110,7 @@ agent.add_node("block_unsafe_content", block_unsafe_content)
 agent.set_entry_point("guard_input")
 
 
-# Check for unsafe input and block further processing if found
+# 检查不安全的输入，如果发现则阻止进一步处理
 def check_safety(state: AgentState) -> Literal["unsafe", "safe"]:
     safety: LlamaGuardOutput = state["safety"]
     match safety.safety_assessment:
@@ -125,18 +124,18 @@ agent.add_conditional_edges(
     "guard_input", check_safety, {"unsafe": "block_unsafe_content", "safe": "model"}
 )
 
-# Always END after blocking unsafe content
+# 阻止不安全内容后总是结束
 agent.add_edge("block_unsafe_content", END)
 
-# Always run "model" after "tools"
+# 总是在"tools"之后运行"model"
 agent.add_edge("tools", "model")
 
 
-# After "model", if there are tool calls, run "tools". Otherwise END.
+# 在"model"之后，如果有工具调用，运行"tools"。否则结束。
 def pending_tool_calls(state: AgentState) -> Literal["tools", "done"]:
     last_message = state["messages"][-1]
     if not isinstance(last_message, AIMessage):
-        raise TypeError(f"Expected AIMessage, got {type(last_message)}")
+        raise TypeError(f"期望 AIMessage，得到 {type(last_message)}")
     if last_message.tool_calls:
         return "tools"
     return "done"

@@ -12,7 +12,7 @@ load_dotenv()
 
 from agents import DEFAULT_AGENT, get_agent  # noqa: E402
 
-# The default agent uses StateGraph.compile() which returns CompiledStateGraph
+# 默认代理使用 StateGraph.compile()，返回 CompiledStateGraph
 agent = cast(CompiledStateGraph, get_agent(DEFAULT_AGENT))
 
 
@@ -26,8 +26,8 @@ async def main() -> None:
     )
     result["messages"][-1].pretty_print()
 
-    # Draw the agent graph as png
-    # requires:
+    # 将代理图绘制为 png
+    # 需要：
     # brew install graphviz
     # export CFLAGS="-I $(brew --prefix graphviz)/include"
     # export LDFLAGS="-L $(brew --prefix graphviz)/lib"

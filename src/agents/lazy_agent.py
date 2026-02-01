@@ -1,4 +1,4 @@
-"""Agent types with async initialization and dynamic graph creation."""
+"""具有异步初始化和动态图创建的代理类型。"""
 
 from abc import ABC, abstractmethod
 
@@ -7,37 +7,37 @@ from langgraph.pregel import Pregel
 
 
 class LazyLoadingAgent(ABC):
-    """Base class for agents that require async loading."""
+    """需要异步加载的代理的基类。"""
 
     def __init__(self) -> None:
-        """Initialize the agent."""
+        """初始化代理。"""
         self._loaded = False
         self._graph: CompiledStateGraph | Pregel | None = None
 
     @abstractmethod
     async def load(self) -> None:
         """
-        Perform async loading for this agent.
+        执行此代理的异步加载。
 
-        This method is called during service startup and should handle:
-        - Setting up external connections (MCP clients, databases, etc.)
-        - Loading tools or resources
-        - Any other async setup required
-        - Creating the agent's graph
+        此方法在服务启动期间调用，应处理：
+        - 设置外部连接（MCP客户端、数据库等）
+        - 加载工具或资源
+        - 任何其他所需的异步设置
+        - 创建代理的图
         """
         raise NotImplementedError  # pragma: no cover
 
     def get_graph(self) -> CompiledStateGraph | Pregel:
         """
-        Get the agent's graph.
+        获取代理的图。
 
-        Returns the graph instance that was created during load().
+        返回在load()期间创建的图实例。
 
-        Returns:
-            The agent's graph (CompiledStateGraph or Pregel)
+        返回：
+            代理的图（CompiledStateGraph或Pregel）
         """
         if not self._loaded:
-            raise RuntimeError("Agent not loaded. Call load() first.")
+            raise RuntimeError("代理未加载。请先调用load()。")
         if self._graph is None:
-            raise RuntimeError("Agent graph not created during load().")
+            raise RuntimeError("在load()期间未创建代理图。")
         return self._graph

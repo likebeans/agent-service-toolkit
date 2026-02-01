@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
-    """Generate idiomatic operation IDs for OpenAPI client generation."""
+    """为 OpenAPI 客户端生成生成惯用的操作 ID。"""
     return route.name
 
 
@@ -65,8 +65,8 @@ def verify_bearer(
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
-    Configurable lifespan that initializes the appropriate database checkpointer, store,
-    and agents with async loading - for example for starting up MCP clients.
+    可配置的生命周期，初始化适当的数据库检查点、存储和代理，
+    并支持异步加载 - 例如用于启动 MCP 客户端。
     """
     try:
         # Initialize both checkpointer (for short-term memory) and store (for long-term memory)
@@ -117,8 +117,8 @@ async def info() -> ServiceMetadata:
 
 async def _handle_input(user_input: UserInput, agent: AgentGraph) -> tuple[dict[str, Any], UUID]:
     """
-    Parse user input and handle any required interrupt resumption.
-    Returns kwargs for agent invocation and the run_id.
+    解析用户输入并处理任何需要的中断恢复。
+    返回代理调用的 kwargs 和 run_id。
     """
     run_id = uuid4()
     thread_id = user_input.thread_id or str(uuid4())
@@ -176,12 +176,12 @@ async def _handle_input(user_input: UserInput, agent: AgentGraph) -> tuple[dict[
 @router.post("/invoke")
 async def invoke(user_input: UserInput, agent_id: str = DEFAULT_AGENT) -> ChatMessage:
     """
-    Invoke an agent with user input to retrieve a final response.
+    使用用户输入调用代理以获取最终响应。
 
-    If agent_id is not provided, the default agent will be used.
-    Use thread_id to persist and continue a multi-turn conversation. run_id kwarg
-    is also attached to messages for recording feedback.
-    Use user_id to persist and continue a conversation across multiple threads.
+    如果未提供 agent_id，将使用默认代理。
+    使用 thread_id 来持久化和继续多轮对话。run_id kwarg
+    也附加到消息上以记录反馈。
+    使用 user_id 来跨多个线程持久化和继续对话。
     """
     # NOTE: Currently this only returns the last message or interrupt.
     # In the case of an agent outputting multiple AIMessages (such as the background step
@@ -217,9 +217,9 @@ async def message_generator(
     user_input: StreamInput, agent_id: str = DEFAULT_AGENT
 ) -> AsyncGenerator[str, None]:
     """
-    Generate a stream of messages from the agent.
+    从代理生成消息流。
 
-    This is the workhorse method for the /stream endpoint.
+    这是 /stream 端点的核心方法。
     """
     agent: AgentGraph = get_agent(agent_id)
     kwargs, run_id = await _handle_input(user_input, agent)
@@ -356,14 +356,14 @@ def _sse_response_example() -> dict[int | str, Any]:
 @router.post("/stream", response_class=StreamingResponse, responses=_sse_response_example())
 async def stream(user_input: StreamInput, agent_id: str = DEFAULT_AGENT) -> StreamingResponse:
     """
-    Stream an agent's response to a user input, including intermediate messages and tokens.
+    将代理对用户输入的响应进行流式传输，包括中间消息和令牌。
 
-    If agent_id is not provided, the default agent will be used.
-    Use thread_id to persist and continue a multi-turn conversation. run_id kwarg
-    is also attached to all messages for recording feedback.
-    Use user_id to persist and continue a conversation across multiple threads.
+    如果未提供 agent_id，将使用默认代理。
+    使用 thread_id 来持久化和继续多轮对话。run_id kwarg
+    也附加到所有消息上以记录反馈。
+    使用 user_id 来跨多个线程持久化和继续对话。
 
-    Set `stream_tokens=false` to return intermediate messages but not token-by-token.
+    设置 `stream_tokens=false` 以返回中间消息但不进行逐令牌传输。
     """
     return StreamingResponse(
         message_generator(user_input, agent_id),
@@ -374,11 +374,11 @@ async def stream(user_input: StreamInput, agent_id: str = DEFAULT_AGENT) -> Stre
 @router.post("/feedback")
 async def feedback(feedback: Feedback) -> FeedbackResponse:
     """
-    Record feedback for a run to LangSmith.
+    将运行的反馈记录到 LangSmith。
 
-    This is a simple wrapper for the LangSmith create_feedback API, so the
-    credentials can be stored and managed in the service rather than the client.
-    See: https://api.smith.langchain.com/redoc#tag/feedback/operation/create_feedback_api_v1_feedback_post
+    这是 LangSmith create_feedback API 的简单包装器，因此
+    凭据可以存储和管理在服务中而不是客户端。
+    参见：https://api.smith.langchain.com/redoc#tag/feedback/operation/create_feedback_api_v1_feedback_post
     """
     client = LangsmithClient()
     kwargs = feedback.kwargs or {}
@@ -394,7 +394,7 @@ async def feedback(feedback: Feedback) -> FeedbackResponse:
 @router.post("/history")
 async def history(input: ChatHistoryInput) -> ChatHistory:
     """
-    Get chat history.
+    获取聊天历史。
     """
     # TODO: Hard-coding DEFAULT_AGENT here is wonky
     agent: AgentGraph = get_agent(DEFAULT_AGENT)
@@ -412,7 +412,7 @@ async def history(input: ChatHistoryInput) -> ChatHistory:
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """健康检查端点。"""
 
     health_status = {"status": "ok"}
 

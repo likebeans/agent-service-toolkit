@@ -98,5 +98,9 @@ class GitHubMCPAgent(LazyLoadingAgent):
         )
 
 
-# Create the agent instance
+# GitHub MCP 代理 - 使用 GitHub MCP 工具进行仓库管理的代理
+# GitHub MCP 代理 - 具有异步初始化的代理
+# 初始化 GitHub MCP 代理
+# 创建 GitHub MCP 代理图
+# 创建代理实例
 github_mcp_agent = GitHubMCPAgent()

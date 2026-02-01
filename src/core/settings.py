@@ -45,7 +45,7 @@ class LogLevel(StrEnum):
     CRITICAL = "CRITICAL"
 
     def to_logging_level(self) -> int:
-        """Convert to Python logging level constant."""
+        """转换为 Python 日志级别常量。"""
         import logging
 
         mapping = {
@@ -148,7 +148,7 @@ class Settings(BaseSettings):
     AZURE_OPENAI_ENDPOINT: str | None = None
     AZURE_OPENAI_API_VERSION: str = "2024-02-15-preview"
     AZURE_OPENAI_DEPLOYMENT_MAP: dict[str, str] = Field(
-        default_factory=dict, description="Map of model names to Azure deployment IDs"
+        default_factory=dict, description="模型名称到 Azure 部署 ID 的映射"
     )
 
     def model_post_init(self, __context: Any) -> None:
